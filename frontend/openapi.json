@@ -1,0 +1,538 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ProcureLens AI Gateway & Forensic Microservices API",
+    "description": "### Enterprise Procurement Fraud & Anomaly Forensic Suite\n\nProcureLens provides autonomous pre-payment procurement fraud detection, multi-model empirical anomaly investigation (Isolation Forest, Autoencoder, Semantic Embeddings, NetworkX Graph Analysis), automated GST/discount reconciliation, and enterprise RBAC governance.\n\n**Authentication:** Stateless JWT Bearer Token. Include `Authorization: Bearer <token>` in request headers.",
+    "contact": {
+      "name": "ProcureLens Engineering & Architecture",
+      "email": "security@procurelens.internal"
+    },
+    "license": {
+      "name": "Enterprise Proprietary License",
+      "url": "https://procurelens.internal/license"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Spring Boot Microservice Gateway (Direct Port 8080)"
+    },
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Frontend Proxy Gateway (Port 3000)"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication & RBAC",
+      "description": "Enterprise identity, credential verification, and role-based access control (RBAC)"
+    },
+    {
+      "name": "Procurement & Quotations",
+      "description": "Multi-vendor quote comparison, GST/tax reconciliation, and discount optimization engine"
+    },
+    {
+      "name": "Forensic Anomaly & Fraud Engine",
+      "description": "Python 3 AI empirical forensic kernel orchestration, multi-model analysis, and ERP payment holds"
+    },
+    {
+      "name": "Vendor Governance",
+      "description": "Vendor discount offers and coupon management"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication & RBAC"
+        ],
+        "summary": "Authenticate user & issue JWT token",
+        "description": "Authenticates user credentials against the MySQL relational user registry and returns a signed JWT token with assigned enterprise permissions.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or account inactive"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/fraud-detection/investigate": {
+      "post": {
+        "tags": [
+          "Forensic Anomaly & Fraud Engine"
+        ],
+        "summary": "Execute full AI forensic anomaly analysis",
+        "description": "Streams invoice payload to the Python 3 Empirical Forensic Kernel (ai_modules/forensic_engine.py) to compute Isolation Forest, Autoencoder, BGE Semantic, NetworkX Graph, and LLM explanation outputs.",
+        "operationId": "investigateAnomaly",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Forensic audit dossier generated successfully"
+          },
+          "403": {
+            "description": "Insufficient role permissions (Auditor/CFO required)"
+          },
+          "500": {
+            "description": "AI pipeline execution error"
+          }
+        }
+      }
+    },
+    "/api/v1/fraud-detection/freeze/{id}": {
+      "post": {
+        "tags": [
+          "Forensic Anomaly & Fraud Engine"
+        ],
+        "summary": "Enforce ERP payment disbursement freeze",
+        "description": "Places an immediate hard disbursement stop on a flagged invoice in SAP S/4HANA / Oracle ERP and records reason in the audit ledger.",
+        "operationId": "enforcePaymentFreeze",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Invoice ID or Voucher reference",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "INV-2024-0891"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Payment successfully frozen"
+          },
+          "403": {
+            "description": "Access denied (CFO or Auditor role required)"
+          }
+        }
+      }
+    },
+    "/api/v1/procurements/calculate-quote": {
+      "post": {
+        "tags": [
+          "Procurement & Quotations"
+        ],
+        "summary": "Calculate and validate single vendor quote",
+        "description": "Computes volume trade discounts, promo coupons, CGST/SGST/IGST tax splits, and compares against vendor-declared amounts to flag discrepancies.",
+        "operationId": "calculateQuote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteCalculationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Quote calculation and tax breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteCalculationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/procurements/compare": {
+      "post": {
+        "tags": [
+          "Procurement & Quotations"
+        ],
+        "summary": "Compare multiple vendor quotations and rank best deal",
+        "description": "Analyzes an entire set of vendor quotes for a requirement, computes tax/discounts, flags high-risk anomalies, and ranks quotes by effective savings.",
+        "operationId": "compareQuotations",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Procurement comparison matrix generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcurementComparisonResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/procurements/vendors/{vendorId}/offers": {
+      "get": {
+        "tags": [
+          "Vendor Governance"
+        ],
+        "summary": "List active discount offers for a vendor",
+        "operationId": "getVendorOffers",
+        "parameters": [
+          {
+            "name": "vendorId",
+            "in": "path",
+            "description": "Vendor unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEND-01"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vendor Governance"
+        ],
+        "summary": "Register new vendor discount offer",
+        "operationId": "createVendorOffer",
+        "parameters": [
+          {
+            "name": "vendorId",
+            "in": "path",
+            "description": "Vendor unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEND-01"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorOffer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/procurements/vendors/{vendorId}/coupons": {
+      "get": {
+        "tags": [
+          "Vendor Governance"
+        ],
+        "summary": "List active promo coupons for a vendor",
+        "operationId": "getVendorCoupons",
+        "parameters": [
+          {
+            "name": "vendorId",
+            "in": "path",
+            "description": "Vendor unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEND-01"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vendor Governance"
+        ],
+        "summary": "Create new vendor promo coupon",
+        "operationId": "createVendorCoupon",
+        "parameters": [
+          {
+            "name": "vendorId",
+            "in": "path",
+            "description": "Vendor unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEND-01"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorCoupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "auditor@procurelens.internal"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123"
+          },
+          "role": {
+            "type": "string",
+            "example": "ROLE_FORENSIC_AUDITOR"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object"
+          }
+        }
+      },
+      "QuoteCalculationRequest": {
+        "type": "object",
+        "properties": {
+          "vendorId": {
+            "type": "string",
+            "example": "VEND-01"
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 52000.0
+          },
+          "offerPercent": {
+            "type": "number",
+            "example": 5.0
+          },
+          "couponCode": {
+            "type": "string",
+            "example": "SAVE5K"
+          },
+          "couponAmount": {
+            "type": "number",
+            "example": 5000.0
+          },
+          "vendorState": {
+            "type": "string",
+            "example": "Maharashtra"
+          },
+          "buyerState": {
+            "type": "string",
+            "example": "Maharashtra"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 10
+          },
+          "gstRate": {
+            "type": "number",
+            "example": 18.0
+          }
+        }
+      },
+      "QuoteCalculationResponse": {
+        "type": "object",
+        "properties": {
+          "vendorId": {
+            "type": "string"
+          },
+          "baseAmount": {
+            "type": "number"
+          },
+          "eligibleDiscount": {
+            "type": "number"
+          },
+          "taxableAmount": {
+            "type": "number"
+          },
+          "cgstAmount": {
+            "type": "number"
+          },
+          "sgstAmount": {
+            "type": "number"
+          },
+          "igstAmount": {
+            "type": "number"
+          },
+          "finalAmount": {
+            "type": "number"
+          },
+          "riskScore": {
+            "type": "integer"
+          },
+          "riskLevel": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcurementComparisonResponse": {
+        "type": "object",
+        "properties": {
+          "requirementTitle": {
+            "type": "string"
+          },
+          "totalQuotesAnalyzed": {
+            "type": "integer"
+          },
+          "recommendedVendorId": {
+            "type": "string"
+          },
+          "quotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteCalculationResponse"
+            }
+          }
+        }
+      },
+      "VendorOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vendorId": {
+            "type": "string"
+          },
+          "offerType": {
+            "type": "string",
+            "enum": ["PERCENTAGE", "FIXED_AMOUNT"]
+          },
+          "offerValue": {
+            "type": "number"
+          },
+          "minimumPurchase": {
+            "type": "number"
+          },
+          "maximumDiscount": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VendorCoupon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vendorId": {
+            "type": "string"
+          },
+          "couponCode": {
+            "type": "string"
+          },
+          "discountType": {
+            "type": "string",
+            "enum": ["PERCENTAGE", "FIXED_AMOUNT"]
+          },
+          "discountValue": {
+            "type": "number"
+          },
+          "minimumOrder": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter your JWT token (obtained from `/api/v1/auth/login`) to authorize requests."
+      }
+    }
+  }
+}

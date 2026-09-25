@@ -1,0 +1,11 @@
+{
+  "name": "procurelens-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProcureLens - Autonomous Procurement Fraud & Anomaly Forensic Suite",
+  "scripts": {
+    "start": "cd frontend && npm start",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build && cd ../backend && mvn compile -DskipTests"
+  }
+}

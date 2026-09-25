@@ -1,0 +1,466 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .font-display {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+
+  .font-mono-numbers {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom dark scrollbar for data tables and dossier panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* =============================================================
+   PREMIUM LIGHT THEME SYSTEM (.light class)
+   Engineered for clean contrast, executive elegance, and intuitive readability.
+   Dark Theme remains 100% untouched.
+   ============================================================= */
+.light {
+  color-scheme: light;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Base Surfaces & Layers */
+.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+.light aside.bg-slate-950 {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+  box-shadow: 1px 0 3px 0 rgba(0, 0, 0, 0.03);
+}
+
+.light header.bg-slate-950,
+.light header.bg-slate-900\/90,
+.light header.bg-slate-900 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.light nav.bg-slate-950\/80 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Cards, Panels & Metric Containers */
+.light .bg-slate-900,
+.light .bg-slate-900\/90,
+.light .bg-slate-900\/80,
+.light .bg-slate-900\/70,
+.light .bg-slate-900\/60,
+.light .bg-slate-900\/50,
+.light .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+}
+
+.light .bg-slate-950\/80,
+.light .bg-slate-950\/90,
+.light .bg-slate-950\/60,
+.light .bg-slate-950\/40 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light .bg-slate-800,
+.light .bg-slate-800\/80,
+.light .bg-slate-800\/60,
+.light .bg-slate-800\/40,
+.light .bg-slate-800\/20 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+/* Executive Gradient Cards in Light Mode */
+.light .bg-gradient-to-r.from-slate-900.via-slate-900.to-slate-950,
+.light .bg-gradient-to-r.from-slate-900.to-slate-950 {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 60%, #f1f5f9 100%) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.light .bg-gradient-to-r.from-rose-950\/30,
+.light .bg-gradient-to-r.from-rose-950\/40,
+.light .bg-gradient-to-r.from-rose-950\/50,
+.light .bg-gradient-to-r.from-purple-950\/30 {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffffff 60%, #f8fafc 100%) !important;
+  border-color: #fecdd3 !important;
+}
+
+.light .bg-gradient-to-r.from-cyan-950\/30,
+.light .bg-gradient-to-r.from-cyan-950\/40 {
+  background: linear-gradient(135deg, #ecfeff 0%, #ffffff 60%, #f8fafc 100%) !important;
+  border-color: #bae6fd !important;
+}
+
+.light .bg-gradient-to-r.from-amber-950\/30,
+.light .bg-gradient-to-r.from-amber-950\/40 {
+  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 60%, #f8fafc 100%) !important;
+  border-color: #fde68a !important;
+}
+
+/* Borders */
+.light .border-slate-800,
+.light .border-slate-800\/80,
+.light .border-slate-800\/60,
+.light .border-slate-800\/40,
+.light .border-slate-900 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Typography High-Contrast Enhancements */
+.light .text-white {
+  color: #0f172a !important;
+}
+
+.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Hero Headings */
+.light .from-rose-400.via-rose-300.to-amber-300 {
+  background-image: linear-gradient(to right, #e11d48, #be123c, #b45309) !important;
+}
+
+/* Inputs, Selects & Textareas */
+.light input,
+.light select,
+.light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.light input:focus,
+.light select:focus,
+.light textarea:focus {
+  border-color: #e11d48 !important;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12) !important;
+  outline: none;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* =============================================================
+   CRYSTAL-CLEAR HIGH CONTRAST BADGES & STATUS PILLS IN LIGHT MODE
+   ============================================================= */
+
+/* Rose / Red / Critical / Danger / Flagged / Escalated */
+.light .text-rose-300,
+.light .text-rose-400,
+.light .text-red-400,
+.light .text-red-500 {
+  color: #be123c !important;
+}
+
+.light .bg-rose-500\/10,
+.light .bg-rose-500\/20,
+.light .bg-rose-950\/80,
+.light .bg-rose-950\/40,
+.light .bg-rose-950\/30,
+.light .bg-red-500\/10,
+.light .bg-red-500\/20 {
+  background-color: #ffe4e6 !important;
+  border-color: #fecdd3 !important;
+}
+
+.light .border-rose-500\/20,
+.light .border-rose-500\/30,
+.light .border-rose-500\/40,
+.light .border-rose-800,
+.light .border-red-500\/20,
+.light .border-red-500\/30 {
+  border-color: #fecdd3 !important;
+}
+
+/* Emerald / Green / Cleared / Approved / Active / Resolved / Paid */
+.light .text-emerald-300,
+.light .text-emerald-400,
+.light .text-green-400 {
+  color: #15803d !important;
+}
+
+.light .bg-emerald-500\/10,
+.light .bg-emerald-500\/20,
+.light .bg-emerald-950\/80,
+.light .bg-green-500\/10,
+.light .bg-green-500\/20 {
+  background-color: #dcfce7 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.light .border-emerald-500\/20,
+.light .border-emerald-500\/30,
+.light .border-emerald-500\/40,
+.light .border-emerald-800,
+.light .border-green-500\/20 {
+  border-color: #bbf7d0 !important;
+}
+
+/* Amber / Yellow / Warning / Submitted / Pending / Under Review */
+.light .text-amber-300,
+.light .text-amber-400,
+.light .text-yellow-300,
+.light .text-yellow-400 {
+  color: #b45309 !important;
+}
+
+.light .bg-amber-500\/10,
+.light .bg-amber-500\/20,
+.light .bg-amber-950\/80,
+.light .bg-yellow-500\/10,
+.light .bg-yellow-500\/20 {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+}
+
+.light .border-amber-500\/20,
+.light .border-amber-500\/30,
+.light .border-amber-500\/40,
+.light .border-amber-800,
+.light .border-yellow-500\/20,
+.light .border-yellow-500\/30 {
+  border-color: #fde68a !important;
+}
+
+/* Cyan / Blue / Sky / Info / Procurement PO Links */
+.light .text-cyan-300,
+.light .text-cyan-400,
+.light .text-sky-300,
+.light .text-sky-400,
+.light .text-blue-400,
+.light .text-blue-500 {
+  color: #0369a1 !important;
+}
+
+.light .bg-cyan-500\/10,
+.light .bg-cyan-500\/20,
+.light .bg-cyan-950\/80,
+.light .bg-sky-500\/10,
+.light .bg-sky-500\/20,
+.light .bg-blue-500\/10,
+.light .bg-blue-500\/20 {
+  background-color: #e0f2fe !important;
+  border-color: #bae6fd !important;
+}
+
+.light .border-cyan-500\/20,
+.light .border-cyan-500\/30,
+.light .border-cyan-500\/40,
+.light .border-cyan-800,
+.light .border-sky-500\/20,
+.light .border-sky-500\/30,
+.light .border-blue-500\/20,
+.light .border-blue-500\/30 {
+  border-color: #bae6fd !important;
+}
+
+/* Purple / Violet / Admin Governance / AI Dossiers */
+.light .text-purple-300,
+.light .text-purple-400,
+.light .text-violet-300,
+.light .text-violet-400 {
+  color: #7e22ce !important;
+}
+
+.light .bg-purple-500\/10,
+.light .bg-purple-500\/20,
+.light .bg-purple-950\/50,
+.light .bg-purple-950\/30 {
+  background-color: #f3e8ff !important;
+  border-color: #e9d5ff !important;
+}
+
+.light .border-purple-500\/20,
+.light .border-purple-500\/30,
+.light .border-purple-500\/40 {
+  border-color: #e9d5ff !important;
+}
+
+/* =============================================================
+   TABLES IN LIGHT THEME
+   ============================================================= */
+.light table {
+  background-color: #ffffff !important;
+}
+
+.light thead tr {
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.light thead th {
+  color: #475569 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em;
+}
+
+.light tbody tr {
+  border-bottom-color: #f1f5f9 !important;
+  background-color: #ffffff;
+}
+
+.light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Primary Action Buttons in Light Mode */
+.light .bg-amber-600,
+.light .bg-amber-500 {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+
+.light .bg-purple-600,
+.light .bg-purple-500 {
+  background-color: #9333ea !important;
+  color: #ffffff !important;
+}
+
+.light .bg-rose-600,
+.light .bg-rose-500 {
+  background-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+
+/* Secondary Button Overrides in Light Mode */
+.light button.bg-slate-800 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.light button.bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Active Nav Links in Light Mode */
+.light .bg-rose-500\/10.border-rose-500\/30 {
+  background-color: #fee2e2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+  font-weight: 700;
+}
+
+.light .hover\:bg-slate-800:hover,
+.light .hover\:bg-slate-800\/60:hover,
+.light .hover\:bg-slate-800\/40:hover,
+.light .hover\:bg-slate-800\/30:hover,
+.light .hover\:bg-slate-900\/60:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+/* =============================================================
+   MODAL BACKDROP OVERLAYS (FROSTED GLASS BLUR IN BOTH THEMES)
+   ============================================================= */
+.fixed.inset-0,
+div.fixed.inset-0,
+.light .fixed.inset-0,
+.light div.fixed.inset-0 {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* Modal Content Card */
+.fixed.inset-0 .bg-slate-900,
+div.fixed.inset-0 .bg-slate-900 {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.light .fixed.inset-0 .bg-slate-900,
+.light div.fixed.inset-0 .bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.2) !important;
+}
+
+/* Footer */
+.light footer {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+/* Scrollbars */
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

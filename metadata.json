@@ -1,0 +1,6 @@
+{
+  "name": "ProcureLens - Autonomous Procurement Fraud & Anomaly Forensic Suite",
+  "description": "Enterprise procurement anomaly detection and fraud investigation platform identifying price gouging, split PO structuring, duplicate billing, and shell vendors with evidence-based forensic reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
