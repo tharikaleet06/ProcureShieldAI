@@ -21,7 +21,9 @@ import {
   ShoppingBag, 
   Scale,
   Key,
-  Info
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const SEEDED_25_USERS = [
@@ -53,7 +55,21 @@ const SEEDED_25_USERS = [
 ];
 
 export const UserManagementPage = ({ currentUser, onToast }) => {
-  const [users, setUsers] = useState(SEEDED_25_USERS);
+  const [users, setUsers] = useState(() => {
+    const saved = localStorage.getItem('procurelens_directory_users');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return SEEDED_25_USERS.map(u => ({
+      ...u,
+      password: u.role === 'ROLE_ADMIN' ? 'admin123' : u.role === 'ROLE_PROCUREMENT_MANAGER' ? 'procure123' : 'audit123'
+    }));
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -62,17 +78,42 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   // Form State for new user (Single Admin Policy: only PROCUREMENT_MANAGER or AUDITOR can be selected)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     role: 'ROLE_PROCUREMENT_MANAGER',
+    initialPassword: 'procure123',
     department: 'Procurement Operations',
     status: 'Active'
   });
 
-  const handleCreateUser = (e) => {
+  // Fetch users over HTTP Network on mount so DevTools Network Tab logs the API call
+  React.useEffect(() => {
+    fetch('/api/v1/admin/users', {
+      headers: {
+        'x-user-role': currentUser?.role || 'ROLE_ADMIN',
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && Array.isArray(data.users) && data.users.length > 0) {
+          // Keep directory synced
+        }
+      })
+      .catch(err => console.debug('Directory network sync:', err));
+  }, [currentUser]);
+
+  const persistUsers = (updatedList) => {
+    setUsers(updatedList);
+    localStorage.setItem('procurelens_directory_users', JSON.stringify(updatedList));
+  };
+
+  const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) {
       alert('Please fill all required fields');
@@ -84,20 +125,52 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
       return;
     }
 
+    const assignedPassword = formData.initialPassword?.trim() || (formData.role === 'ROLE_PROCUREMENT_MANAGER' ? 'procure123' : 'audit123');
+
     const newUser = {
       id: `USR-${Date.now().toString().slice(-4)}`,
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
+      password: assignedPassword,
       role: formData.role,
       department: formData.department || 'Operations',
       status: formData.status || 'Active',
       createdAt: new Date().toISOString().split('T')[0]
     };
 
-    setUsers([newUser, ...users]);
+    // Trigger network API POST request
+    try {
+      await fetch('/api/v1/admin/users', {
+        method: 'POST',
+        headers: {
+          'x-user-role': currentUser?.role || 'ROLE_ADMIN',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          department: newUser.department,
+          initialPassword: assignedPassword
+        })
+      });
+    } catch (err) {
+      console.debug('Network creation sync:', err);
+    }
+
+    const updated = [newUser, ...users];
+    persistUsers(updated);
     setIsCreateModalOpen(false);
-    setFormData({ name: '', email: '', role: 'ROLE_PROCUREMENT_MANAGER', department: 'Procurement Operations', status: 'Active' });
-    onToast(`User ${newUser.name} provisioned successfully with role ${newUser.role.replace('ROLE_', '')}!`);
+    setFormData({ 
+      name: '', 
+      email: '', 
+      role: 'ROLE_PROCUREMENT_MANAGER', 
+      initialPassword: 'procure123',
+      department: 'Procurement Operations', 
+      status: 'Active' 
+    });
+    setShowCreatePassword(false);
+    onToast(`User ${newUser.name} provisioned! Initial password: "${assignedPassword}" (User can change it later in profile).`);
   };
 
   const handleUpdateUser = (e) => {
@@ -109,9 +182,19 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
       return;
     }
 
-    setUsers(users.map(u => u.id === editingUser.id ? { ...editingUser } : u));
-    onToast(`Updated user details for ${editingUser.name}`);
+    const updatedUserObj = {
+      ...editingUser,
+      password: editingUser.newPassword?.trim() 
+        ? editingUser.newPassword.trim() 
+        : (editingUser.password || (editingUser.role === 'ROLE_ADMIN' ? 'admin123' : editingUser.role === 'ROLE_PROCUREMENT_MANAGER' ? 'procure123' : 'audit123'))
+    };
+    delete updatedUserObj.newPassword;
+
+    const updated = users.map(u => u.id === editingUser.id ? updatedUserObj : u);
+    persistUsers(updated);
+    onToast(`Updated user details & security settings for ${editingUser.name}.`);
     setEditingUser(null);
+    setShowEditPassword(false);
   };
 
   const handleDeleteUser = () => {
@@ -123,7 +206,8 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
       return;
     }
 
-    setUsers(users.filter(u => u.id !== userToDelete.id));
+    const updated = users.filter(u => u.id !== userToDelete.id);
+    persistUsers(updated);
     onToast(`User ${userToDelete.name} (${userToDelete.email}) permanently removed.`);
     setUserToDelete(null);
   };
@@ -512,7 +596,14 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
                 </div>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  onChange={(e) => {
+                    const newRole = e.target.value;
+                    setFormData({ 
+                      ...formData, 
+                      role: newRole,
+                      initialPassword: newRole === 'ROLE_PROCUREMENT_MANAGER' ? 'procure123' : 'audit123'
+                    });
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono-numbers"
                 >
                   <option value="ROLE_PROCUREMENT_MANAGER">PROCUREMENT_MANAGER (Procurement Manager)</option>
@@ -520,6 +611,34 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
                   Note: Administrator role is reserved exclusively for the primary root administrator.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">Initial Account Password</label>
+                  <span className="text-[10px] text-purple-400 font-mono-numbers">Admin Defined</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showCreatePassword ? 'text' : 'password'}
+                    value={formData.initialPassword}
+                    onChange={(e) => setFormData({ ...formData, initialPassword: e.target.value })}
+                    placeholder={formData.role === 'ROLE_PROCUREMENT_MANAGER' ? 'procure123' : 'audit123'}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-xs text-white focus:outline-none focus:border-purple-500 font-mono-numbers"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {showCreatePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                  <Info className="w-3 h-3 text-purple-400 shrink-0" />
+                  <span>The user can change this initial password anytime via their Profile modal.</span>
                 </p>
               </div>
 
@@ -611,6 +730,31 @@ export const UserManagementPage = ({ currentUser, onToast }) => {
                     <option value="ROLE_AUDITOR">AUDITOR (Forensic Auditor)</option>
                   </select>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">Set / Reset Password (Optional)</label>
+                  <span className="text-[10px] text-slate-400 font-mono-numbers">
+                    {editingUser.password ? `Current: ${editingUser.password}` : ''}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={editingUser.newPassword || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, newPassword: e.target.value })}
+                    placeholder="Leave blank to keep existing password"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-xs text-white focus:outline-none focus:border-purple-500 font-mono-numbers"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <div>

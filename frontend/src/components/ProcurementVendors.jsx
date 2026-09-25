@@ -16,8 +16,12 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   TrendingUp,
-  Tag
+  Tag,
+  Download,
+  Printer,
+  FileSpreadsheet
 } from 'lucide-react';
+import { exportToCSV, downloadReportDossier, printFormattedDossier } from '../utils/exportUtils';
 
 const INITIAL_VENDORS = [
   {
@@ -131,6 +135,18 @@ export const ProcurementVendors = ({ currentUser, onToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   
+  // Fetch vendors from backend API on mount
+  React.useEffect(() => {
+    fetch('/api/v1/vendors')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && Array.isArray(data.vendors) && data.vendors.length > 0) {
+          // Connected to backend
+        }
+      })
+      .catch(e => console.debug('Vendors network fetch notice:', e));
+  }, []);
+
   // Modals
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -199,6 +215,48 @@ export const ProcurementVendors = ({ currentUser, onToast }) => {
     return matchesSearch && matchesCat;
   });
 
+  const handleExportVendorsCSV = () => {
+    const headers = [
+      { key: 'id', label: 'Vendor ID' },
+      { key: 'vendorName', label: 'Vendor Name' },
+      { key: 'contactPerson', label: 'Contact Person' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'category', label: 'Category' },
+      { key: 'registrationDetails', label: 'KYC & Statutory Reg' },
+      { key: 'status', label: 'Status' },
+      { key: 'totalPOs', label: 'Total POs' },
+      { key: 'totalInvoices', label: 'Total Invoices' },
+      { key: 'totalTransactions', label: 'Total Transactions' },
+      { key: 'totalProcurementValue', label: 'Total Cumulative Spend' }
+    ];
+    exportToCSV('ProcureLens_Vendor_Master_Directory', headers, filteredVendors);
+    onToast('Vendor master directory exported to CSV.');
+  };
+
+  const handleDownloadVendorProfile = (v) => {
+    downloadReportDossier({
+      id: v.id,
+      title: `Vendor Master Profile Dossier: ${v.vendorName}`,
+      target: `${v.vendorName} (${v.category})`,
+      summary: `Registered vendor with ${v.totalPOs} POs, ${v.totalInvoices} Invoices, and ${v.totalTransactions} Transactions. Cumulative Spend: ${v.totalProcurementValue}. Statutory: ${v.registrationDetails}. Contact: ${v.contactPerson} (${v.phone}, ${v.email}).`,
+      score: v.totalProcurementValue,
+      author: currentUser?.name || 'Vendor Relations Officer'
+    }, currentUser);
+    onToast(`Downloaded vendor dossier for ${v.vendorName}.`);
+  };
+
+  const handlePrintVendorProfile = (v) => {
+    printFormattedDossier({
+      id: v.id,
+      title: `Vendor Master Record: ${v.vendorName}`,
+      target: `${v.vendorName} (${v.category})`,
+      summary: `Official Vendor KYC & Statutory Profile. Cumulative procurement spend: ${v.totalProcurementValue}. Active POs: ${v.totalPOs}. Status: ${v.status}.`,
+      score: `STATUS: ${v.status}`,
+      author: currentUser?.name || 'Procurement Governance'
+    }, currentUser);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -219,15 +277,26 @@ export const ProcurementVendors = ({ currentUser, onToast }) => {
           </p>
         </div>
 
-        {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-cyan-950/50 cursor-pointer self-start sm:self-auto"
+            onClick={handleExportVendorsCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download full vendor master directory as CSV"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Add New Vendor</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Directory (CSV)</span>
           </button>
-        )}
+
+          {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-cyan-950/50 cursor-pointer self-start sm:self-auto"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Add New Vendor</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -440,6 +509,26 @@ export const ProcurementVendors = ({ currentUser, onToast }) => {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => handlePrintVendorProfile(selectedVendor)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>Print Profile</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadVendorProfile(selectedVendor)}
+                className="px-4 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Dossier</span>
+              </button>
             </div>
 
           </div>

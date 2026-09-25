@@ -14,8 +14,14 @@ import {
   ArrowRight,
   Cpu,
   ShieldAlert,
-  ArrowUpRight
+  ArrowUpRight,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  Paperclip,
+  FileCheck
 } from 'lucide-react';
+import { exportToCSV, downloadReportDossier, printFormattedDossier, downloadInvoiceDocument, downloadAttachedFile } from '../utils/exportUtils';
 
 const INITIAL_INVOICES = [
   {
@@ -28,6 +34,8 @@ const INITIAL_INVOICES = [
     invoiceDate: '25-09-2026',
     status: 'SUBMITTED',
     analysisStatus: 'FLAGGED',
+    documentName: 'INV1025_ABC_Invoice_Scanned.pdf',
+    documentSize: '2.1 MB',
     itemDescription: 'Desktop Computers & High Performance Workstations (10 units @ ₹80,000)',
     notes: 'Submitted for corporate disbursement. PO amount is ₹6,50,000.'
   },
@@ -41,6 +49,8 @@ const INITIAL_INVOICES = [
     invoiceDate: '24-09-2026',
     status: 'APPROVED',
     analysisStatus: 'CLEARED',
+    documentName: 'INV1024_Zenith_Rack_Invoice.pdf',
+    documentSize: '1.4 MB',
     itemDescription: 'Server Rack Components & Rails',
     notes: '3-way match verified against GRN-2026-991.'
   },
@@ -54,6 +64,8 @@ const INITIAL_INVOICES = [
     invoiceDate: '20-09-2026',
     status: 'FLAGGED',
     analysisStatus: 'FLAGGED',
+    documentName: 'INV1020_Apex_HeatExchanger.pdf',
+    documentSize: '3.8 MB',
     itemDescription: 'Industrial Titanium Heat Exchanger (1 unit @ ₹1,85,000)',
     notes: 'Price spike detected (+270% over baseline).'
   },
@@ -67,6 +79,8 @@ const INITIAL_INVOICES = [
     invoiceDate: '19-08-2026',
     status: 'PAID',
     analysisStatus: 'CLEARED',
+    documentName: 'INV1019_ABC_Desktops_TaxInv.pdf',
+    documentSize: '1.1 MB',
     itemDescription: '10 Standard Desktops',
     notes: 'Settled on 20-08-2026.'
   }
@@ -76,6 +90,17 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
   const [invoices, setInvoices] = useState(INITIAL_INVOICES);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Fetch live invoices & transaction data over network
+  React.useEffect(() => {
+    fetch('/api/transactions', { headers: { 'x-user-role': currentUser?.role || 'ROLE_PROCUREMENT_MANAGER' } })
+      .then(res => res.json())
+      .catch(e => console.debug('Invoices transactions network fetch:', e));
+
+    fetch('/api/v1/vendors')
+      .then(res => res.json())
+      .catch(e => console.debug('Invoices vendors fetch:', e));
+  }, [currentUser]);
 
   // Modals
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -89,11 +114,18 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
     amount: 800000,
     invoiceDate: '2026-09-25',
     itemDescription: 'Enterprise Desktop Workstations (10 units)',
-    status: 'SUBMITTED'
+    status: 'SUBMITTED',
+    documentFile: null,
+    documentFileName: ''
   });
 
   const handleAddInvoice = (e) => {
     e.preventDefault();
+    if (!formData.documentFileName && !formData.documentFile) {
+      onToast('⚠️ Document upload is mandatory. Please attach the supplier invoice scan.');
+      return;
+    }
+
     const newInv = {
       id: formData.invoiceNumber,
       invoiceNumber: formData.invoiceNumber,
@@ -105,12 +137,25 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
       status: formData.status,
       analysisStatus: Number(formData.amount) > 650000 ? 'FLAGGED' : 'CLEARED',
       itemDescription: formData.itemDescription,
-      notes: 'Manually ingested and linked to PO.'
+      documentName: formData.documentFileName || 'Invoice_Document_Scanned.pdf',
+      documentSize: formData.documentFile ? `${(formData.documentFile.size / 1024).toFixed(1)} KB` : '1.9 MB',
+      notes: 'Manually ingested and linked with mandatory invoice document.'
     };
 
     setInvoices([newInv, ...invoices]);
     setIsAddModalOpen(false);
-    onToast(`Invoice #${newInv.invoiceNumber} uploaded & linked to PO #${newInv.poNumber}`);
+    setFormData({
+      invoiceNumber: `INV${1026 + invoices.length + 1}`,
+      vendorName: 'ABC Computers',
+      poNumber: 'PO1025',
+      amount: 800000,
+      invoiceDate: '2026-09-25',
+      itemDescription: 'Enterprise Desktop Workstations (10 units)',
+      status: 'SUBMITTED',
+      documentFile: null,
+      documentFileName: ''
+    });
+    onToast(`Invoice #${newInv.invoiceNumber} uploaded with document ${newInv.documentName}.`);
   };
 
   const handleSubmitForAnalysis = (invId) => {
@@ -146,6 +191,43 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
     }
   };
 
+  const handleExportInvoicesCSV = () => {
+    const headers = [
+      { key: 'invoiceNumber', label: 'Invoice Number' },
+      { key: 'vendorName', label: 'Vendor Name' },
+      { key: 'poNumber', label: 'Linked PO Number' },
+      { key: 'amount', label: 'Billed Amount (INR)' },
+      { key: 'invoiceDate', label: 'Invoice Date' },
+      { key: 'status', label: 'Disbursement Status' },
+      { key: 'analysisStatus', label: 'AI Anomaly Status' },
+      { key: 'itemDescription', label: 'Line Description' },
+      { key: 'notes', label: 'Audit Notes' }
+    ];
+    exportToCSV('ProcureLens_Invoices_Registry', headers, filteredInvoices);
+    onToast('Invoices registry exported to CSV.');
+  };
+
+  const handleDownloadInvoice = (inv) => {
+    downloadInvoiceDocument(inv, currentUser);
+    onToast(`Downloading official Tax Invoice document for #${inv.invoiceNumber}...`);
+  };
+
+  const handleDownloadAttachedFile = (fileName, invId) => {
+    downloadAttachedFile(fileName, invId, 'Vendor Tax Invoice Scanned Copy');
+    onToast(`Downloading attached invoice file: ${fileName}...`);
+  };
+
+  const handlePrintInvoice = (inv) => {
+    printFormattedDossier({
+      id: inv.invoiceNumber,
+      title: `Invoice Voucher: ${inv.invoiceNumber}`,
+      target: `${inv.vendorName} (PO #${inv.poNumber})`,
+      summary: `Vendor Invoice billed amount ₹${inv.amount.toLocaleString('en-IN')} for ${inv.itemDescription}. Status: ${inv.status} · AI Status: ${inv.analysisStatus}.`,
+      score: `STATUS: ${inv.status}`,
+      author: currentUser?.name || 'Accounts Payable'
+    }, currentUser);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -166,15 +248,26 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
           </p>
         </div>
 
-        {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow cursor-pointer self-start sm:self-auto"
+            onClick={handleExportInvoicesCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download invoice list as CSV"
           >
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload Invoice Data</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Invoices (CSV)</span>
           </button>
-        )}
+
+          {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow cursor-pointer self-start sm:self-auto"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Upload Invoice Data</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search */}
@@ -243,7 +336,13 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
                   </td>
 
                   <td className="py-3 px-4 font-mono-numbers font-bold text-white">
-                    ₹{inv.amount.toLocaleString('en-IN')}
+                    <div>₹{inv.amount.toLocaleString('en-IN')}</div>
+                    {inv.documentName && (
+                      <div className="text-[10px] text-amber-400 font-normal flex items-center gap-1 mt-0.5">
+                        <Paperclip className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate max-w-[120px]">{inv.documentName}</span>
+                      </div>
+                    )}
                   </td>
 
                   <td className="py-3 px-4 text-slate-400">
@@ -357,6 +456,33 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
               </div>
             </div>
 
+            {/* Attached Invoice Document */}
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs gap-3">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Paperclip className="w-4 h-4" />
+                </div>
+                <div className="overflow-hidden">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">ATTACHED INVOICE SCANNED DOCUMENT</span>
+                  <span className="text-white font-bold font-mono-numbers truncate block">{selectedInvoice.documentName || 'Invoice_Document_Scanned.pdf'}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] text-slate-400 font-mono-numbers bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                  {selectedInvoice.documentSize || '2.1 MB'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadAttachedFile(selectedInvoice.documentName || `INV_${selectedInvoice.invoiceNumber}_Scanned.pdf`, selectedInvoice.invoiceNumber)}
+                  className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  title="Download attached scanned invoice file"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
+              </div>
+            </div>
+
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 space-y-1">
               <div className="font-bold text-slate-200">Item Specification:</div>
               <div>{selectedInvoice.itemDescription}</div>
@@ -364,25 +490,43 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handlePrintInvoice(selectedInvoice)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>Print Invoice</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadInvoice(selectedInvoice)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+                <span>Download Document</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedInvoice(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-xl"
+                className="px-3.5 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-xl"
               >
                 Close
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleSubmitForAnalysis(selectedInvoice.id);
-                  setSelectedInvoice(null);
-                }}
-                className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                <Cpu className="w-3.5 h-3.5" />
-                <span>Run AI Analysis</span>
-              </button>
+              {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSubmitForAnalysis(selectedInvoice.id);
+                    setSelectedInvoice(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Cpu className="w-3.5 h-3.5" />
+                  <span>Run AI Analysis</span>
+                </button>
+              )}
             </div>
 
           </div>
@@ -392,7 +536,7 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
       {/* Add / Upload Invoice Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-md w-full rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="max-w-md w-full rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -454,6 +598,46 @@ export const ProcurementInvoices = ({ currentUser, onToast, onNavigateTab }) => 
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono-numbers"
                   />
+                </div>
+              </div>
+
+              {/* Mandatory Invoice Document Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Official Scanned Invoice Document <span className="text-rose-400 font-bold">* (Mandatory)</span></span>
+                  <span className="text-[10px] text-slate-400 font-mono-numbers">PDF, PNG, JPG</span>
+                </label>
+                <div className="relative border-2 border-dashed border-slate-700 hover:border-amber-500 rounded-xl p-3 bg-slate-950/60 text-center transition-colors">
+                  <input
+                    type="file"
+                    required
+                    accept=".pdf,.png,.jpg,.jpeg,.xml"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setFormData({
+                          ...formData,
+                          documentFile: file,
+                          documentFileName: file.name
+                        });
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1 pointer-events-none">
+                    <UploadCloud className="w-5 h-5 text-amber-400" />
+                    {formData.documentFileName ? (
+                      <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 font-mono-numbers">
+                        <FileCheck className="w-4 h-4" />
+                        <span>{formData.documentFileName}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-xs text-slate-300 font-medium">Click to upload or drag &amp; drop invoice</span>
+                        <span className="text-[10px] text-slate-500">Official vendor bill/tax invoice copy required</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 

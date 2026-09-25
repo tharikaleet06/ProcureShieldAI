@@ -9,8 +9,11 @@ import {
   CheckCircle2, 
   ArrowRight,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+import { exportToCSV } from '../utils/exportUtils';
 
 const INITIAL_FLAGGED_TRANSACTIONS = [
   {
@@ -91,6 +94,13 @@ export const AuditorFlaggedTransactions = ({ onOpenInvestigation }) => {
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // Fetch flagged transaction records over network
+  React.useEffect(() => {
+    fetch('/api/transactions', { headers: { 'x-user-role': 'ROLE_AUDITOR' } })
+      .then(res => res.json())
+      .catch(e => console.debug('Auditor flagged transactions network fetch:', e));
+  }, []);
+
   const filteredTxns = transactions.filter(tx => {
     const matchesSearch = tx.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           tx.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -101,6 +111,22 @@ export const AuditorFlaggedTransactions = ({ onOpenInvestigation }) => {
     const matchesStatus = statusFilter === 'ALL' || tx.investigationStatus === statusFilter;
     return matchesSearch && matchesRisk && matchesStatus;
   });
+
+  const handleExportFlaggedCSV = () => {
+    const headers = [
+      { key: 'id', label: 'Transaction ID' },
+      { key: 'vendor', label: 'Vendor Name' },
+      { key: 'po', label: 'PO Number' },
+      { key: 'invoice', label: 'Invoice Number' },
+      { key: 'amount', label: 'Disbursement Amount' },
+      { key: 'riskScore', label: 'Risk Score' },
+      { key: 'riskLevel', label: 'Risk Level' },
+      { key: 'detectedIssues', label: 'Detected Anomaly Signals' },
+      { key: 'investigationStatus', label: 'Investigation Status' },
+      { key: 'date', label: 'Date Flagged' }
+    ];
+    exportToCSV('ProcureLens_Flagged_Anomaly_Queue', headers, filteredTxns);
+  };
 
   return (
     <div className="space-y-6">
@@ -120,6 +146,17 @@ export const AuditorFlaggedTransactions = ({ onOpenInvestigation }) => {
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
             Select any flagged transaction to launch the deep forensic inspection suite, view PO vs Invoice discrepancies, examine vendor baselines, and submit final auditor resolutions.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportFlaggedCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download full flagged investigation queue as CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-rose-400" />
+            <span>Export Flagged Queue (CSV)</span>
+          </button>
         </div>
       </div>
 

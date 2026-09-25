@@ -105,6 +105,7 @@
 }
 
 .light .bg-slate-800,
+.light .bg-slate-800\/90,
 .light .bg-slate-800\/80,
 .light .bg-slate-800\/60,
 .light .bg-slate-800\/40,
@@ -112,6 +113,18 @@
   background-color: #f1f5f9 !important;
   border-color: #e2e8f0 !important;
   color: #1e293b !important;
+}
+
+/* User Profile Tiles & Modal in Light Mode */
+.light .user-profile-tile {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06) !important;
+}
+
+.light .user-profile-tile:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* Executive Gradient Cards in Light Mode */

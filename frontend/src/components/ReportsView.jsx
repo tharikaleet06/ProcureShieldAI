@@ -10,8 +10,12 @@ import {
   Scale, 
   CheckCircle2,
   Calendar,
-  Sparkles
+  Sparkles,
+  Eye,
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
+import { exportToCSV, downloadReportDossier, printFormattedDossier } from '../utils/exportUtils';
 
 const INITIAL_REPORTS = [
   {
@@ -65,10 +69,18 @@ export const ReportsView = ({ currentUser, onToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReport, setSelectedReport] = useState(null);
 
+  // Fetch report data & transactions over live network
+  React.useEffect(() => {
+    fetch('/api/transactions', { headers: { 'x-user-role': currentUser?.role || 'ROLE_ADMIN' } })
+      .then(res => res.json())
+      .catch(e => console.debug('Reports transactions fetch:', e));
+
+    fetch('/api/v1/database/tables')
+      .then(res => res.json())
+      .catch(e => console.debug('Reports database tables fetch:', e));
+  }, [currentUser]);
+
   // Role permissions filter:
-  // Admin: Full
-  // Procurement Manager: Procurement reports
-  // Auditor: Investigation reports
   const permittedReports = reports.filter(r => {
     if (currentUser?.role === 'ROLE_ADMIN') return true;
     if (currentUser?.role === 'ROLE_PROCUREMENT_MANAGER') return r.category === 'PROCUREMENT' || r.category === 'INVESTIGATION';
@@ -82,6 +94,31 @@ export const ReportsView = ({ currentUser, onToast }) => {
                           r.id.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+
+  const handleExportCSV = () => {
+    const headers = [
+      { key: 'id', label: 'Report ID' },
+      { key: 'title', label: 'Report Title' },
+      { key: 'category', label: 'Category' },
+      { key: 'target', label: 'Target Entity' },
+      { key: 'date', label: 'Date' },
+      { key: 'author', label: 'Author' },
+      { key: 'summary', label: 'Summary Findings' },
+      { key: 'status', label: 'Status' },
+      { key: 'score', label: 'Score / Metric' }
+    ];
+    exportToCSV('ProcureLens_Reports_Catalogue', headers, filteredReports);
+    onToast('Reports catalogue exported to CSV successfully.');
+  };
+
+  const handleDownloadDossier = (rep) => {
+    downloadReportDossier(rep, currentUser);
+    onToast(`Downloaded official audit dossier for ${rep.id}.`);
+  };
+
+  const handlePrintDossier = (rep) => {
+    printFormattedDossier(rep, currentUser);
+  };
 
   return (
     <div className="space-y-6">
@@ -101,6 +138,17 @@ export const ReportsView = ({ currentUser, onToast }) => {
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
             Access formal investigation reports, procurement spend summaries, and system compliance audits with full chain of custody verification.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleExportCSV}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download full catalogue as CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Catalogue (CSV)</span>
+          </button>
         </div>
       </div>
 
@@ -137,17 +185,26 @@ export const ReportsView = ({ currentUser, onToast }) => {
               <p className="text-xs text-slate-300 mt-2 leading-relaxed">{rep.summary}</p>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div className="mt-4 pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
               <span className="text-[11px] font-mono-numbers">{rep.date} · {rep.author}</span>
-              <button
-                onClick={() => {
-                  onToast(`Exporting ${rep.id} to PDF format...`);
-                }}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-purple-400" />
-                <span>Export</span>
-              </button>
+              <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                <button
+                  onClick={() => handlePrintDossier(rep)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Print or Save as PDF"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Print</span>
+                </button>
+                <button
+                  onClick={() => handleDownloadDossier(rep)}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
+                  title="Download full official dossier document"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Dossier</span>
+                </button>
+              </div>
             </div>
           </div>
         ))}

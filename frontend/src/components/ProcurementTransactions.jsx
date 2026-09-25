@@ -12,11 +12,18 @@ import {
   Receipt, 
   Cpu, 
   ShieldAlert, 
-  ArrowRight,
-  Sparkles,
-  CreditCard,
-  Scale
+  ArrowRight, 
+  Sparkles, 
+  CreditCard, 
+  Scale,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  Paperclip,
+  UploadCloud,
+  FileCheck
 } from 'lucide-react';
+import { exportToCSV, downloadReportDossier, printFormattedDossier, downloadTransactionDocument, downloadAttachedFile } from '../utils/exportUtils';
 
 const INITIAL_TRANSACTIONS = [
   {
@@ -29,6 +36,8 @@ const INITIAL_TRANSACTIONS = [
     date: '25-09-2026',
     paymentMethod: 'Corporate Wire (RTGS)',
     bankRouting: 'HDFC0001042',
+    documentName: 'RTGS_Advice_TX1025_BankProof.pdf',
+    documentSize: '1.4 MB',
     analysisStatus: 'FLAGGED',
     riskScore: 87,
     riskLevel: 'HIGH',
@@ -45,6 +54,8 @@ const INITIAL_TRANSACTIONS = [
     date: '24-09-2026',
     paymentMethod: 'NEFT Automated Clearing',
     bankRouting: 'SBIN0000300',
+    documentName: 'NEFT_Payment_Advice_TX1024.pdf',
+    documentSize: '890 KB',
     analysisStatus: 'CLEARED',
     riskScore: 12,
     riskLevel: 'LOW',
@@ -61,6 +72,8 @@ const INITIAL_TRANSACTIONS = [
     date: '20-09-2026',
     paymentMethod: 'Corporate Wire (RTGS)',
     bankRouting: 'ICIC0009914',
+    documentName: 'Bank_Transfer_Slip_TX1020.pdf',
+    documentSize: '1.1 MB',
     analysisStatus: 'FLAGGED',
     riskScore: 94,
     riskLevel: 'HIGH',
@@ -77,6 +90,8 @@ const INITIAL_TRANSACTIONS = [
     date: '20-08-2026',
     paymentMethod: 'Corporate Wire (RTGS)',
     bankRouting: 'HDFC0001042',
+    documentName: 'Corporate_Disbursal_Advice_TX1019.pdf',
+    documentSize: '1.2 MB',
     analysisStatus: 'CLEARED',
     riskScore: 14,
     riskLevel: 'LOW',
@@ -93,6 +108,8 @@ const INITIAL_TRANSACTIONS = [
     date: '05-08-2026',
     paymentMethod: 'Corporate Wire (RTGS)',
     bankRouting: 'HDFC0001042',
+    documentName: 'Disbursement_Receipt_TX1012.pdf',
+    documentSize: '950 KB',
     analysisStatus: 'CLEARED',
     riskScore: 15,
     riskLevel: 'LOW',
@@ -106,6 +123,13 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
   const [searchQuery, setSearchQuery] = useState('');
   const [analysisFilter, setAnalysisFilter] = useState('ALL');
 
+  // Fetch live transaction records over network
+  React.useEffect(() => {
+    fetch('/api/transactions', { headers: { 'x-user-role': currentUser?.role || 'ROLE_PROCUREMENT_MANAGER' } })
+      .then(res => res.json())
+      .catch(e => console.debug('Transactions network fetch:', e));
+  }, [currentUser]);
+
   // Modals
   const [selectedTx, setSelectedTx] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -118,11 +142,19 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
     amount: 800000,
     date: '2026-09-25',
     paymentMethod: 'Corporate Wire (RTGS)',
-    bankRouting: 'HDFC0001042'
+    bankRouting: 'HDFC0001042',
+    documentFileName: '',
+    documentFileSize: ''
   });
 
   const handleCreateTransaction = (e) => {
     e.preventDefault();
+
+    if (!formData.documentFileName) {
+      onToast('⚠️ Mandatory bank disbursal advice / transaction document upload is required.');
+      return;
+    }
+
     const newTx = {
       id: `TX${1025 + transactions.length + 1}`,
       vendorId: formData.vendorName.includes('ABC') ? 'VEND-ABC-01' : 'VEND-GEN-01',
@@ -133,6 +165,8 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
       date: formData.date,
       paymentMethod: formData.paymentMethod,
       bankRouting: formData.bankRouting,
+      documentName: formData.documentFileName,
+      documentSize: formData.documentFileSize || '1.5 MB',
       analysisStatus: 'PENDING',
       riskScore: 0,
       riskLevel: 'PENDING',
@@ -142,7 +176,18 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
 
     setTransactions([newTx, ...transactions]);
     setIsCreateModalOpen(false);
-    onToast(`Transaction ${newTx.id} created for ₹${newTx.amount.toLocaleString('en-IN')}. Ready for AI analysis.`);
+    setFormData({
+      vendorName: 'ABC Computers',
+      poNumber: 'PO1025',
+      invoiceNumber: 'INV1025',
+      amount: 800000,
+      date: '2026-09-25',
+      paymentMethod: 'Corporate Wire (RTGS)',
+      bankRouting: 'HDFC0001042',
+      documentFileName: '',
+      documentFileSize: ''
+    });
+    onToast(`Transaction ${newTx.id} created with verified document attached. Ready for AI analysis.`);
   };
 
   const handleRunAiAnalysis = (txId) => {
@@ -178,6 +223,48 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
     return matchesSearch && matchesAnalysis;
   });
 
+  const handleExportTxCSV = () => {
+    const headers = [
+      { key: 'id', label: 'Transaction ID' },
+      { key: 'vendorName', label: 'Vendor Name' },
+      { key: 'poNumber', label: 'PO Number' },
+      { key: 'invoiceNumber', label: 'Invoice Number' },
+      { key: 'amount', label: 'Disbursement Amount (INR)' },
+      { key: 'date', label: 'Transaction Date' },
+      { key: 'paymentMethod', label: 'Payment Method' },
+      { key: 'bankRouting', label: 'Bank / Routing Reference' },
+      { key: 'documentName', label: 'Supporting Document File' },
+      { key: 'analysisStatus', label: 'AI Status' },
+      { key: 'riskScore', label: 'Risk Score' },
+      { key: 'riskLevel', label: 'Risk Level' },
+      { key: 'detectedIssues', label: 'Detected Issues' },
+      { key: 'investigationStatus', label: 'Investigation Status' }
+    ];
+    exportToCSV('ProcureLens_Transactions_Ledger', headers, filteredTxns);
+    onToast('Transactions ledger exported to CSV.');
+  };
+
+  const handleDownloadTxReceipt = (tx) => {
+    downloadTransactionDocument(tx, currentUser);
+    onToast(`Downloading official Disbursement Voucher for #${tx.id}...`);
+  };
+
+  const handleDownloadAttachedFile = (fileName, txId) => {
+    downloadAttachedFile(fileName, txId, 'Bank Payment Voucher & Wire Advice');
+    onToast(`Downloading attached payment advice: ${fileName}...`);
+  };
+
+  const handlePrintTxReceipt = (tx) => {
+    printFormattedDossier({
+      id: tx.id,
+      title: `Transaction Voucher: ${tx.id}`,
+      target: `${tx.vendorName} (PO #${tx.poNumber} / INV #${tx.invoiceNumber})`,
+      summary: `Financial disbursement totaling ₹${tx.amount.toLocaleString('en-IN')} via ${tx.paymentMethod}. Supporting File: ${tx.documentName || 'DisbursalAdvice.pdf'}. AI Risk Score: ${tx.riskScore}/100. Signals: ${tx.detectedIssues}.`,
+      score: `STATUS: ${tx.analysisStatus}`,
+      author: currentUser?.name || 'Finance Lead'
+    }, currentUser);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -194,19 +281,30 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
             Transactions &amp; AI Analysis Queue
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Record disbursement transactions linked to Vendors, POs, and Invoices. Submit transactions for empirical AI analysis. Flagged transactions are routed directly to the Auditor.
+            Record disbursement transactions linked to Vendors, POs, and Invoices. Upload mandatory bank disbursal documentation and submit transactions for empirical AI analysis.
           </p>
         </div>
 
-        {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer self-start sm:self-auto"
+            onClick={handleExportTxCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download transaction ledger as CSV"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Record Transaction</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Ledger (CSV)</span>
           </button>
-        )}
+
+          {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer self-start sm:self-auto"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>New Transaction</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search */}
@@ -266,7 +364,13 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
                   </td>
 
                   <td className="py-3 px-4 font-semibold text-slate-200">
-                    {tx.vendorName}
+                    <div>{tx.vendorName}</div>
+                    {tx.documentName && (
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-normal mt-0.5">
+                        <Paperclip className="w-2.5 h-2.5 text-emerald-400" />
+                        <span className="truncate max-w-[140px]">{tx.documentName}</span>
+                      </div>
+                    )}
                   </td>
 
                   <td className="py-3 px-4 font-mono-numbers text-[11px]">
@@ -276,7 +380,8 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
                   </td>
 
                   <td className="py-3 px-4 font-mono-numbers font-bold text-white">
-                    ₹{tx.amount.toLocaleString('en-IN')}
+                    <div>₹{tx.amount.toLocaleString('en-IN')}</div>
+                    <div className="text-[10px] text-slate-400 font-normal">{tx.paymentMethod}</div>
                   </td>
 
                   <td className="py-3 px-4 font-mono-numbers text-slate-400">
@@ -392,6 +497,35 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
               </div>
             </div>
 
+            {/* Attached Disbursal Document Proof */}
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                  <Paperclip className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>{selectedTx.documentName || 'Bank_Disbursement_Advice.pdf'}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono-numbers">
+                      VERIFIED ATTACHMENT
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Mandatory Disbursal Proof · {selectedTx.documentSize || '1.4 MB'} · Digital Audit Vault
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownloadAttachedFile(selectedTx.documentName || `TX_${selectedTx.id}_BankProof.pdf`, selectedTx.id)}
+                className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                title="Download attached payment advice file"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download</span>
+              </button>
+            </div>
+
             {/* Payment & Banking */}
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
@@ -419,11 +553,27 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handlePrintTxReceipt(selectedTx)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>Print Voucher</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadTxReceipt(selectedTx)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Download Document</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedTx(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-xl"
+                className="px-3.5 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-xl"
               >
                 Close
               </button>
@@ -458,15 +608,15 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
         </div>
       )}
 
-      {/* Record Transaction Modal */}
+      {/* New Transaction Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-md w-full rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="max-w-md w-full rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
-                <span>Record Procurement Transaction</span>
+                <PlusCircle className="w-4 h-4 text-emerald-400" />
+                <span>Create New Transaction</span>
               </h3>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
@@ -550,6 +700,59 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
                 </select>
               </div>
 
+              {/* Mandatory Document Upload */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Supporting Payment Document / Bank Advice
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                    * Mandatory
+                  </span>
+                </div>
+                <div className="relative border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl p-3.5 bg-slate-950/60 text-center transition-all group">
+                  <input
+                    type="file"
+                    required
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xml,.csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setFormData({
+                          ...formData,
+                          documentFileName: file.name,
+                          documentFileSize: `${(file.size / 1024).toFixed(1)} KB`
+                        });
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  {formData.documentFileName ? (
+                    <div className="flex items-center justify-center gap-2 text-emerald-400">
+                      <FileCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-white truncate max-w-[240px]">
+                          {formData.documentFileName}
+                        </p>
+                        <p className="text-[10px] text-emerald-400 font-mono-numbers">
+                          {formData.documentFileSize} · Attached for Audit Trail
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-1 text-slate-400 group-hover:text-slate-200">
+                      <UploadCloud className="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition-colors" />
+                      <p className="text-xs font-medium text-slate-300">
+                        <span className="text-emerald-400 font-bold underline">Click to upload</span> or drag payment voucher
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        PDF, DOCX, RTGS Receipt, Scanned Bank Slip (Max 25MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
@@ -560,9 +763,10 @@ export const ProcurementTransactions = ({ currentUser, onToast, onOpenInvestigat
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
                 >
-                  Record &amp; Stage
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Create Transaction &amp; Stage</span>
                 </button>
               </div>
             </form>

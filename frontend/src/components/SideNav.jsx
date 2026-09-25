@@ -21,10 +21,14 @@ export const SideNav = ({
   currentTab, 
   onSelectTab, 
   currentUser, 
-  onLogout 
+  onLogout,
+  onOpenProfile
 }) => {
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
-  const role = currentUser?.role || 'ROLE_ADMIN';
+  const rawRole = currentUser?.role || 'ROLE_ADMIN';
+  const role = rawRole.includes('AUDIT') ? 'ROLE_AUDITOR' : 
+               rawRole.includes('PROC') ? 'ROLE_PROCUREMENT_MANAGER' : 
+               'ROLE_ADMIN';
 
   // Define role-specific navigation menus strictly according to the permission matrix
   const getNavItems = () => {
@@ -123,24 +127,29 @@ export const SideNav = ({
 
         {/* User Profile Summary */}
         {currentUser && (
-          <div className="p-3.5 mx-3 my-3 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="p-3.5 mx-3 my-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800/80 hover:border-slate-700 flex flex-col gap-1.5 text-left transition-all cursor-pointer group shadow-sm"
+            title="Click to view full profile, account details & set new password"
+          >
+            <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-xs flex items-center justify-center border border-rose-500/40 font-mono-numbers">
+                <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-xs flex items-center justify-center border border-rose-500/40 font-mono-numbers group-hover:bg-rose-500/30 transition-colors">
                   {currentUser.avatarInitials || (currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'US')}
                 </div>
                 <div className="truncate max-w-[130px]">
-                  <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
+                  <p className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors truncate">{currentUser.name}</p>
                   <p className="text-[10px] text-slate-400 truncate">{currentUser.department}</p>
                 </div>
               </div>
             </div>
 
-            <div className={`mt-1 px-2 py-0.5 rounded text-[10px] font-mono-numbers font-semibold border flex items-center justify-between ${getRoleBadgeStyle(currentUser.role)}`}>
+            <div className={`mt-1 px-2 py-0.5 rounded text-[10px] font-mono-numbers font-semibold border flex items-center justify-between w-full ${getRoleBadgeStyle(currentUser.role)}`}>
               <span>{getRoleDisplayName(currentUser.role)}</span>
               <ShieldCheck className="w-3 h-3 shrink-0" />
             </div>
-          </div>
+          </button>
         )}
 
         {/* Main Navigation Links */}

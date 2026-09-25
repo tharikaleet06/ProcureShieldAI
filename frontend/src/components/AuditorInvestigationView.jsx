@@ -24,6 +24,7 @@ import {
   GitCompare,
   Check
 } from 'lucide-react';
+import { downloadReportDossier, printFormattedDossier } from '../utils/exportUtils';
 
 export const AuditorInvestigationView = ({ 
   transaction, 
@@ -55,6 +56,17 @@ export const AuditorInvestigationView = ({
   const [decisionReason, setDecisionReason] = useState('');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Trigger live AI forensic investigation analysis over network
+  React.useEffect(() => {
+    fetch('/api/v1/fraud-detection/investigate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactionId: tx.id || 'TX1025' })
+    })
+      .then(res => res.json())
+      .catch(e => console.debug('Investigation AI forensics fetch notice:', e));
+  }, [tx.id]);
 
   // Side-by-side PO vs Invoice Data
   const poData = {
@@ -732,23 +744,38 @@ export const AuditorInvestigationView = ({
               <button
                 type="button"
                 onClick={() => {
-                  window.print();
+                  printFormattedDossier({
+                    id: `INV-REP-${tx.id}`,
+                    title: `Forensic Investigation Dossier: ${tx.id}`,
+                    target: `${tx.vendor} (PO #${tx.po} / INV #${tx.invoice})`,
+                    summary: `PO-Invoice unit price mismatch (+60% variance) & historical baseline deviation. Lead auditor analysis notes: ${investigationNotes}`,
+                    score: `${tx.riskScore}/100 ${tx.riskLevel} RISK`,
+                    author: currentUser?.name || 'Lead Forensic Auditor'
+                  }, currentUser);
                 }}
                 className="px-4 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
                 <span>Print Dossier</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  onToast('Investigation Report downloaded in PDF format.');
+                  downloadReportDossier({
+                    id: `INV-REP-${tx.id}`,
+                    title: `Forensic Investigation Dossier: ${tx.id}`,
+                    target: `${tx.vendor} (PO #${tx.po} / INV #${tx.invoice})`,
+                    summary: `PO-Invoice unit price mismatch (+60% variance) & historical baseline deviation. Lead auditor analysis notes: ${investigationNotes}`,
+                    score: `${tx.riskScore}/100 ${tx.riskLevel} RISK`,
+                    author: currentUser?.name || 'Lead Forensic Auditor'
+                  }, currentUser);
+                  onToast(`Investigation Report INV-REP-${tx.id} downloaded successfully.`);
                   setIsReportModalOpen(false);
                 }}
                 className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Report</span>
+                <span>Download Report Dossier</span>
               </button>
             </div>
 

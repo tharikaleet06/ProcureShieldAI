@@ -15,6 +15,7 @@ import { AuditorFlaggedTransactions } from './components/AuditorFlaggedTransacti
 import { AuditorInvestigationView } from './components/AuditorInvestigationView';
 import { SystemActivityLog } from './components/SystemActivityLog';
 import { ReportsView } from './components/ReportsView';
+import { UserProfileModal } from './components/UserProfileModal';
 import { CheckCircle2 } from 'lucide-react';
 
 const TAB_HASH_MAP = {
@@ -106,6 +107,7 @@ export default function App() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [activeInvestigationTx, setActiveInvestigationTx] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Action Notification Banner
   const [toastMessage, setToastMessage] = useState(null);
@@ -248,6 +250,19 @@ export default function App() {
         onSelectTab={handleSelectTab}
         currentUser={currentUser}
         onLogout={handleSignOut}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+      />
+
+      {/* User Profile & Security Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onUpdateUser={(updated) => {
+          setCurrentUser(updated);
+          localStorage.setItem('procurelens_user', JSON.stringify(updated));
+        }}
+        onToast={showToast}
       />
 
       {/* Right Main Content Area */}
@@ -255,17 +270,9 @@ export default function App() {
         
         {/* Global Header */}
         <Header
-          onRefresh={() => {
-            setIsLoading(true);
-            setTimeout(() => {
-              setIsLoading(false);
-              showToast('Active window refreshed.');
-            }, 300);
-          }}
-          isLoading={isLoading}
           currentUser={currentUser}
           onNavigateLanding={() => navigateTo('LANDING')}
-          onNavigateLogin={() => navigateTo('LOGIN')}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -274,14 +281,14 @@ export default function App() {
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
           
           {/* ROLE 1: ADMIN VIEWS */}
-          {currentUser?.role === 'ROLE_ADMIN' && activeTab === 'DASHBOARD' && (
+          {((currentUser?.role || '').includes('ADMIN') || (!currentUser?.role)) && activeTab === 'DASHBOARD' && (
             <AdminDashboard
               onNavigateTab={handleSelectTab}
               currentUser={currentUser}
             />
           )}
 
-          {currentUser?.role === 'ROLE_ADMIN' && activeTab === 'USERS' && (
+          {((currentUser?.role || '').includes('ADMIN')) && activeTab === 'USERS' && (
             <UserManagementPage
               currentUser={currentUser}
               onToast={showToast}
@@ -289,7 +296,7 @@ export default function App() {
           )}
 
           {/* ROLE 2: PROCUREMENT MANAGER VIEWS */}
-          {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && activeTab === 'DASHBOARD' && (
+          {(currentUser?.role || '').includes('PROC') && activeTab === 'DASHBOARD' && (
             <ProcurementDashboard
               onNavigateTab={handleSelectTab}
               currentUser={currentUser}
@@ -297,7 +304,7 @@ export default function App() {
           )}
 
           {/* ROLE 3: AUDITOR VIEWS */}
-          {currentUser?.role === 'ROLE_AUDITOR' && activeTab === 'DASHBOARD' && (
+          {(currentUser?.role || '').includes('AUDIT') && activeTab === 'DASHBOARD' && (
             <AuditorDashboard
               onNavigateTab={handleSelectTab}
               onOpenInvestigation={handleOpenInvestigation}

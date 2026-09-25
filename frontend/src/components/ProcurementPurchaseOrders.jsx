@@ -14,8 +14,15 @@ import {
   Calendar,
   IndianRupee,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  Paperclip,
+  UploadCloud,
+  FileCheck
 } from 'lucide-react';
+import { exportToCSV, downloadReportDossier, printFormattedDossier, downloadPODocument, downloadAttachedFile } from '../utils/exportUtils';
 
 const INITIAL_POS = [
   {
@@ -25,6 +32,8 @@ const INITIAL_POS = [
     date: '25-09-2026',
     status: 'APPROVED',
     associatedInvoice: 'INV1025',
+    documentName: 'PO1025_Requisition_Signoff.pdf',
+    documentSize: '1.8 MB',
     items: [
       { name: 'Desktop Computer', quantity: 10, unitPrice: 50000, total: 500000 },
       { name: 'Monitor', quantity: 10, unitPrice: 15000, total: 150000 }
@@ -40,6 +49,8 @@ const INITIAL_POS = [
     date: '24-09-2026',
     status: 'COMPLETED',
     associatedInvoice: 'INV1024',
+    documentName: 'PO1024_Server_Racks_Quote.pdf',
+    documentSize: '2.4 MB',
     items: [
       { name: 'Server Rack Components', quantity: 4, unitPrice: 105000, total: 420000 }
     ],
@@ -54,6 +65,8 @@ const INITIAL_POS = [
     date: '22-09-2026',
     status: 'PENDING',
     associatedInvoice: null,
+    documentName: 'PO1023_Printers_Approval.pdf',
+    documentSize: '950 KB',
     items: [
       { name: 'Office High-Speed Laser Printers', quantity: 5, unitPrice: 45000, total: 225000 }
     ],
@@ -68,6 +81,8 @@ const INITIAL_POS = [
     date: '20-09-2026',
     status: 'APPROVED',
     associatedInvoice: 'INV1020',
+    documentName: 'PO1022_Plant4_Exchanger_Specs.pdf',
+    documentSize: '3.1 MB',
     items: [
       { name: 'Industrial Titanium Heat Exchanger', quantity: 1, unitPrice: 50000, total: 50000 }
     ],
@@ -82,6 +97,8 @@ const INITIAL_POS = [
     date: '15-09-2026',
     status: 'DRAFT',
     associatedInvoice: null,
+    documentName: 'PO1021_Peripherals_Draft.pdf',
+    documentSize: '620 KB',
     items: [
       { name: 'Wireless Ergonomic Mice & Keyboards', quantity: 50, unitPrice: 2000, total: 100000 }
     ],
@@ -96,6 +113,17 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // Fetch live purchase orders & transactions over network
+  React.useEffect(() => {
+    fetch('/api/transactions', { headers: { 'x-user-role': currentUser?.role || 'ROLE_PROCUREMENT_MANAGER' } })
+      .then(res => res.json())
+      .catch(e => console.debug('Purchase orders network fetch:', e));
+
+    fetch('/api/v1/vendors')
+      .then(res => res.json())
+      .catch(e => console.debug('PO vendors fetch:', e));
+  }, [currentUser]);
+
   // Modals
   const [selectedPO, setSelectedPO] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -107,6 +135,8 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
     date: '2026-09-25',
     status: 'APPROVED',
     department: 'Corporate IT Infrastructure',
+    documentFile: null,
+    documentFileName: '',
     items: [
       { name: 'Desktop Computer', quantity: 10, unitPrice: 50000 },
       { name: 'Monitor', quantity: 10, unitPrice: 15000 }
@@ -137,6 +167,11 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
 
   const handleCreatePO = (e) => {
     e.preventDefault();
+    if (!formData.documentFileName && !formData.documentFile) {
+      onToast('⚠️ Document upload is mandatory. Please attach a purchase requisition.');
+      return;
+    }
+
     const calculatedItems = formData.items.map(it => ({
       ...it,
       total: it.quantity * it.unitPrice
@@ -150,15 +185,29 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
       date: formData.date,
       status: formData.status,
       associatedInvoice: null,
+      documentName: formData.documentFileName || 'PO_Requisition_Signoff.pdf',
+      documentSize: formData.documentFile ? `${(formData.documentFile.size / 1024).toFixed(1)} KB` : '1.5 MB',
       items: calculatedItems,
       totalAmount,
       department: formData.department,
-      notes: 'Created via Procurement Manager Workbench.'
+      notes: 'Created with mandatory supporting requisition attachment.'
     };
 
     setPos([newPO, ...pos]);
     setIsCreateModalOpen(false);
-    onToast(`Purchase Order ${newPO.id} created for ${newPO.vendorName} (₹${totalAmount.toLocaleString('en-IN')})`);
+    setFormData({
+      vendorName: 'ABC Computers',
+      date: '2026-09-25',
+      status: 'APPROVED',
+      department: 'Corporate IT Infrastructure',
+      documentFile: null,
+      documentFileName: '',
+      items: [
+        { name: 'Desktop Computer', quantity: 10, unitPrice: 50000 },
+        { name: 'Monitor', quantity: 10, unitPrice: 15000 }
+      ]
+    });
+    onToast(`Purchase Order ${newPO.id} created with document ${newPO.documentName} attached.`);
   };
 
   const handleStatusChange = (poId, newStatus) => {
@@ -196,6 +245,42 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
     }
   };
 
+  const handleExportPOCSV = () => {
+    const headers = [
+      { key: 'id', label: 'PO Number' },
+      { key: 'vendorName', label: 'Vendor Name' },
+      { key: 'date', label: 'Issue Date' },
+      { key: 'department', label: 'Department' },
+      { key: 'totalAmount', label: 'Total Amount (INR)' },
+      { key: 'status', label: 'Approval Status' },
+      { key: 'associatedInvoice', label: 'Linked Invoice' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToCSV('ProcureLens_Purchase_Orders_Ledger', headers, filteredPOs);
+    onToast('Purchase Orders ledger exported to CSV.');
+  };
+
+  const handleDownloadPO = (po) => {
+    downloadPODocument(po, currentUser);
+    onToast(`Downloading official Purchase Order document for #${po.id}...`);
+  };
+
+  const handleDownloadAttachedFile = (fileName, poId) => {
+    downloadAttachedFile(fileName, poId, 'Purchase Order Requisition');
+    onToast(`Downloading attached document: ${fileName}...`);
+  };
+
+  const handlePrintPO = (po) => {
+    printFormattedDossier({
+      id: po.id,
+      title: `Purchase Order: ${po.id}`,
+      target: `${po.vendorName} (${po.department})`,
+      summary: `Official Purchase Order issued for ₹${po.totalAmount.toLocaleString('en-IN')}. Items: ${po.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}. Status: ${po.status}. Linked Invoice: ${po.associatedInvoice || 'None'}.`,
+      score: `STATUS: ${po.status}`,
+      author: currentUser?.name || 'Procurement Manager'
+    }, currentUser);
+  };
+
   return (
     <div className="space-y-6">
       
@@ -216,15 +301,26 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
           </p>
         </div>
 
-        {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-950/50 cursor-pointer self-start sm:self-auto"
+            onClick={handleExportPOCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            title="Download full PO list as CSV"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Create New PO</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export POs (CSV)</span>
           </button>
-        )}
+
+          {currentUser?.role === 'ROLE_PROCUREMENT_MANAGER' && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-950/50 cursor-pointer self-start sm:self-auto"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Create New PO</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search */}
@@ -299,8 +395,14 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
                     </span>
                   </td>
 
-                  <td className="py-3 px-4 font-mono-numbers font-bold text-white">
-                    ₹{po.totalAmount.toLocaleString('en-IN')}
+                  <td className="py-3 px-4 font-mono-numbers text-white font-bold">
+                    <div>₹{po.totalAmount.toLocaleString('en-IN')}</div>
+                    {po.documentName && (
+                      <div className="text-[10px] text-blue-400 font-normal flex items-center gap-1 mt-0.5">
+                        <Paperclip className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate max-w-[120px]">{po.documentName}</span>
+                      </div>
+                    )}
                   </td>
 
                   <td className="py-3 px-4">
@@ -332,7 +434,7 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
                   <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => setSelectedPO(po)}
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer ml-auto"
                     >
                       <Eye className="w-3.5 h-3.5 text-blue-400" />
                       <span>View PO</span>
@@ -415,12 +517,59 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
               </div>
             </div>
 
+            {/* Attached Supporting Document */}
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs gap-3">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <Paperclip className="w-4 h-4" />
+                </div>
+                <div className="overflow-hidden">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">ATTACHED REQUISITION / QUOTE DOCUMENT</span>
+                  <span className="text-white font-bold font-mono-numbers truncate block">{selectedPO.documentName || 'PO_Signed_Requisition.pdf'}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] text-slate-400 font-mono-numbers bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                  {selectedPO.documentSize || '1.8 MB'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadAttachedFile(selectedPO.documentName || `PO_${selectedPO.id}_Requisition.pdf`, selectedPO.id)}
+                  className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  title="Download attached requisition file"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
+              </div>
+            </div>
+
             {/* Associated Invoice */}
             <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
               <span className="text-slate-400">Associated Linked Invoice:</span>
               <span className="font-mono-numbers font-bold text-amber-400">
                 {selectedPO.associatedInvoice ? `#${selectedPO.associatedInvoice}` : 'None linked'}
               </span>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => handlePrintPO(selectedPO)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>Print PO</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadPO(selectedPO)}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PO Voucher</span>
+              </button>
             </div>
 
           </div>
@@ -479,6 +628,46 @@ export const ProcurementPurchaseOrders = ({ currentUser, onToast, onNavigateTab 
                     <option value="PENDING">PENDING</option>
                     <option value="DRAFT">DRAFT</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Mandatory Document Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Supporting Purchase Requisition Document <span className="text-rose-400 font-bold">* (Mandatory)</span></span>
+                  <span className="text-[10px] text-slate-400 font-mono-numbers">PDF, DOCX, PNG</span>
+                </label>
+                <div className="relative border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-xl p-3 bg-slate-950/60 text-center transition-colors">
+                  <input
+                    type="file"
+                    required
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setFormData({
+                          ...formData,
+                          documentFile: file,
+                          documentFileName: file.name
+                        });
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1 pointer-events-none">
+                    <UploadCloud className="w-5 h-5 text-blue-400" />
+                    {formData.documentFileName ? (
+                      <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 font-mono-numbers">
+                        <FileCheck className="w-4 h-4" />
+                        <span>{formData.documentFileName}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-xs text-slate-300 font-medium">Click to upload or drag &amp; drop document</span>
+                        <span className="text-[10px] text-slate-500">Signed Requisition, Quote, or RFP file required</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
